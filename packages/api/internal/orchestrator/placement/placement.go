@@ -96,10 +96,9 @@ func placeSandbox(
 	// failures (where the context is still live) carry no node, so callers never
 	// pin a retry to a node that genuinely refused the sandbox.
 	//
-	// TODO [EN-1099]: We key off ctx.Err() rather than the gRPC status code because
-	// the orchestrator currently collapses a timed-out resume into codes.Internal
-	// (it folds the deadline cause into the message, not the code),
-	// so the code alone cannot tell a timeout apart from a hard failure.
+	// A node can exhaust its own create timeout while this request still has
+	// time to try another node. Only the caller's context determines whether
+	// placement timed out; older orchestrators can also report it as Internal.
 	failed := func(err error) (PlacementResult, error) {
 		if ctx.Err() == nil {
 			return PlacementResult{}, err

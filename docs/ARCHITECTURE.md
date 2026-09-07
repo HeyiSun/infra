@@ -340,6 +340,12 @@ gets a response, the sandbox is fully usable. Fresh creates are internally a *re
 template's base snapshot (cold boots happen for filesystem-only templates and builds, or when
 an explicit resume requests one — see pause and resume below; template creates never do).
 
+Failures from `ResumeSandbox` or `RebootSandbox` return gRPC `Canceled` or `DeadlineExceeded`
+when the orchestrator's create request is canceled or expires; missing snapshot files still
+take precedence as `FailedPrecondition`. The API uses its own placement deadline to decide
+whether to retain a warmed node for a later retry, since a node's timeout can leave time to
+try another node.
+
 ### Sandbox traffic
 
 ```mermaid

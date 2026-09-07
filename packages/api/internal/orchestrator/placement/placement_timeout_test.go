@@ -69,34 +69,38 @@ func erroringClient(cancel context.CancelFunc, err error) *nodemanager.MockSandb
 	}
 }
 
-// TestPlaceSandbox_TimeoutPinsFirstTriedNode is the core prod scenario: a node
-// fails (here with codes.Internal, the code the orchestrator returns for a
-// timed-out resume) and the request context is cancelled. PlaceSandbox must
-// surface that node so a retry can be pinned to it - detection must NOT depend
-// on the gRPC code being DeadlineExceeded/Canceled.
+// A cancelled request pins the warming node for both old orchestrators returning
+// Internal and newer ones preserving the timeout/cancellation status.
 func TestPlaceSandbox_TimeoutPinsFirstTriedNode(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(t.Context())
+	for _, code := range []codes.Code{codes.Internal, codes.DeadlineExceeded, codes.Canceled} {
+		t.Run(code.String(), func(t *testing.T) {
+			t.Parallel()
 
-	node := nodemanager.NewTestNode("node-test", api.NodeStatusReady, 0, 8)
-	node.SetSandboxClient(erroringClient(cancel, status.Error(codes.Internal, "failed to create sandbox: request timed out")))
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
 
-	result, err := PlaceSandbox(
-		ctx,
-		failIfCalled(t),
-		[]*nodemanager.Node{node},
-		node,
-		testSbxRequest("sbx-1"),
-		CPURequirement{},
-		false,
-		nil,
-	)
+			node := nodemanager.NewTestNode("node-test", api.NodeStatusReady, 0, 8)
+			node.SetSandboxClient(erroringClient(cancel, status.Error(code, "failed to create sandbox: request timed out")))
 
-	require.Error(t, err)
-	assert.True(t, result.TimedOut, "expected the failure to be reported as a timeout")
-	require.NotNil(t, result.WarmedNode)
-	assert.Equal(t, node.ID, result.WarmedNode.ID)
+			result, err := PlaceSandbox(
+				ctx,
+				failIfCalled(t),
+				[]*nodemanager.Node{node},
+				node,
+				testSbxRequest("sbx-1"),
+				CPURequirement{},
+				false,
+				nil,
+			)
+
+			require.Error(t, err)
+			assert.True(t, result.TimedOut, "expected the failure to be reported as a timeout")
+			require.NotNil(t, result.WarmedNode)
+			assert.Equal(t, node.ID, result.WarmedNode.ID)
+		})
+	}
 }
 
 // TestPlaceSandbox_PinsFirstTriedNodeNotLater verifies that across multiple
@@ -136,29 +140,63 @@ func TestPlaceSandbox_PinsFirstTriedNodeNotLater(t *testing.T) {
 	assert.Equal(t, first.ID, result.WarmedNode.ID, "must pin the first node tried, not a later one")
 }
 
-// TestPlaceSandbox_HardFailureNotWrapped verifies a failure where the context is
-// still live (a genuine error, not a timeout) is returned unchanged, so a retry
-// is never pinned to a node that actually refused the sandbox.
-func TestPlaceSandbox_HardFailureNotWrapped(t *testing.T) {
+// A node timeout or cancellation does not mean the placement budget has expired.
+func TestPlaceSandbox_LiveContextFailureNotPinned(t *testing.T) {
 	t.Parallel()
 
-	node := nodemanager.NewTestNode("node-internal", api.NodeStatusReady, 0, 8)
-	node.SetSandboxClient(erroringClient(nil, status.Error(codes.Internal, "boom")))
+	for _, code := range []codes.Code{codes.Internal, codes.DeadlineExceeded, codes.Canceled} {
+		t.Run(code.String(), func(t *testing.T) {
+			t.Parallel()
+
+			node := nodemanager.NewTestNode("node-failed", api.NodeStatusReady, 0, 8)
+			createErr := status.Error(code, "failed to create sandbox")
+			node.SetSandboxClient(erroringClient(nil, createErr))
+
+			result, err := PlaceSandbox(
+				t.Context(),
+				failIfCalled(t),
+				[]*nodemanager.Node{node},
+				node,
+				testSbxRequest("sbx-3"),
+				CPURequirement{},
+				false,
+				nil,
+			)
+
+			require.ErrorIs(t, err, createErr)
+			assert.False(t, result.TimedOut, "a live-context failure must not be reported as a timeout")
+			assert.Nil(t, result.WarmedNode, "a live-context failure must not surface a warming node")
+		})
+	}
+}
+
+func TestPlaceSandbox_NodeDeadlineRetriesWhileContextLive(t *testing.T) {
+	t.Parallel()
+
+	first := nodemanager.NewTestNode("node-timed-out", api.NodeStatusReady, 0, 8)
+	first.SetSandboxClient(erroringClient(nil, status.Error(codes.DeadlineExceeded, "request timed out")))
+	second := nodemanager.NewTestNode("node-ok", api.NodeStatusReady, 0, 8)
+
+	algo := stubAlgorithm{choose: func(map[string]struct{}) (*nodemanager.Node, error) {
+		return second, nil
+	}}
 
 	result, err := PlaceSandbox(
 		t.Context(),
-		failIfCalled(t),
-		[]*nodemanager.Node{node},
-		node,
-		testSbxRequest("sbx-3"),
+		algo,
+		[]*nodemanager.Node{first, second},
+		first,
+		testSbxRequest("sbx-node-deadline"),
 		CPURequirement{},
 		false,
 		nil,
 	)
 
-	require.Error(t, err)
-	assert.False(t, result.TimedOut, "a live-context failure must not be reported as a timeout")
-	assert.Nil(t, result.WarmedNode, "a live-context failure must not surface a warming node")
+	require.NoError(t, err)
+	require.NotNil(t, result.Node)
+	assert.Equal(t, second.ID, result.Node.ID)
+	assert.False(t, result.TimedOut)
+	assert.Nil(t, result.WarmedNode)
 }
 
 // TestPlaceSandbox_ResourceExhaustedNotPinned verifies that a node which refused

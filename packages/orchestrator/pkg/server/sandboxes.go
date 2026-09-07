@@ -98,6 +98,20 @@ func filesystemBoot(meta metadata.Template, req *orchestrator.SandboxCreateReque
 	return meta.IsFilesystemOnly() || req.GetFilesystemBoot()
 }
 
+func sandboxCreateErrorCode(ctx context.Context, err error) codes.Code {
+	if errors.Is(err, storage.ErrObjectNotExist) {
+		return codes.FailedPrecondition
+	}
+
+	// A custom timeout cause need not wrap context.DeadlineExceeded. The
+	// request context still records whether its deadline expired or it was canceled.
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return status.FromContextError(ctxErr).Code()
+	}
+
+	return codes.Internal
+}
+
 // firecrackerSupports reports whether the sandbox's RUNNING Firecracker
 // carries a version-gated feature, per the given fcversion predicate. The
 // version is fixed at resume, so the answer cannot change under a running
@@ -327,7 +341,8 @@ func (s *Server) Create(ctx context.Context, req *orchestrator.SandboxCreateRequ
 		)
 	}
 	if err != nil {
-		if errors.Is(err, storage.ErrObjectNotExist) {
+		code := sandboxCreateErrorCode(ctx, err)
+		if code == codes.FailedPrecondition {
 			// Snapshot data not found, let the API know the data aren't probably upload yet
 			telemetry.ReportError(ctx, "sandbox files not found", err, telemetry.WithSandboxID(req.GetSandbox().GetSandboxId()))
 
@@ -346,7 +361,7 @@ func (s *Server) Create(ctx context.Context, req *orchestrator.SandboxCreateRequ
 			logger.WithFirecrackerVersion(config.FirecrackerConfig.FirecrackerVersion),
 		)
 
-		return nil, status.Errorf(codes.Internal, "failed to create sandbox: %s", err)
+		return nil, status.Errorf(code, "failed to create sandbox: %s", err)
 	}
 
 	s.setupSandboxLifecycle(ctx, sbx)
