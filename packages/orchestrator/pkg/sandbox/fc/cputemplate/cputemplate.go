@@ -164,3 +164,15 @@ func AppliedDigest(tmpl *Template) string {
 
 	return tmpl.Digest()
 }
+
+// AppliedJSON returns the applied settings as normalized JSON for build metadata.
+// Nil and empty templates return an empty string because no configuration is sent
+// to Firecracker. String normalizes object fields and whitespace while preserving
+// modifier order and values.
+func AppliedJSON(tmpl *Template) string {
+	if tmpl == nil || tmpl.IsEmpty() {
+		return ""
+	}
+
+	return tmpl.String()
+}

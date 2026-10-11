@@ -119,7 +119,7 @@ func (s *scriptedClient) DeleteBuild(context.Context, uuid.UUID, string, uuid.UU
 	return nil
 }
 
-func (s *scriptedClient) SetFinished(context.Context, uuid.UUID, int64, string, string, string) error {
+func (s *scriptedClient) SetFinished(context.Context, uuid.UUID, int64, string, string, string, string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

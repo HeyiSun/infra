@@ -1108,8 +1108,11 @@ type TemplateBuildMetadata struct {
 	// Shared with the orchestrator so the API can match the build's scheduling
 	// metadata against create/resume responses without a separate format.
 	SchedulingMetadata *orchestrator.SchedulingMetadata `protobuf:"bytes,5,opt,name=schedulingMetadata,proto3" json:"schedulingMetadata,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Normalized custom CPU template JSON from the final artifact's metadata.
+	// Empty means no custom CPU template was applied.
+	CpuTemplate   string `protobuf:"bytes,6,opt,name=cpuTemplate,proto3" json:"cpuTemplate,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TemplateBuildMetadata) Reset() {
@@ -1175,6 +1178,13 @@ func (x *TemplateBuildMetadata) GetSchedulingMetadata() *orchestrator.Scheduling
 		return x.SchedulingMetadata
 	}
 	return nil
+}
+
+func (x *TemplateBuildMetadata) GetCpuTemplate() string {
+	if x != nil {
+		return x.CpuTemplate
+	}
+	return ""
 }
 
 type TemplateBuildLogEntry struct {
@@ -1471,13 +1481,14 @@ const file_template_manager_proto_rawDesc = "" +
 	"\abuildID\x18\x01 \x01(\tR\abuildID\x12\x1e\n" +
 	"\n" +
 	"templateID\x18\x02 \x01(\tR\n" +
-	"templateID\"\x80\x02\n" +
+	"templateID\"\xa2\x02\n" +
 	"\x15TemplateBuildMetadata\x12$\n" +
 	"\rrootfsSizeKey\x18\x01 \x01(\x05R\rrootfsSizeKey\x12&\n" +
 	"\x0eenvdVersionKey\x18\x02 \x01(\tR\x0eenvdVersionKey\x12$\n" +
 	"\rkernelVersion\x18\x03 \x01(\tR\rkernelVersion\x12.\n" +
 	"\x12firecrackerVersion\x18\x04 \x01(\tR\x12firecrackerVersion\x12C\n" +
-	"\x12schedulingMetadata\x18\x05 \x01(\v2\x13.SchedulingMetadataR\x12schedulingMetadata\"\x83\x02\n" +
+	"\x12schedulingMetadata\x18\x05 \x01(\v2\x13.SchedulingMetadataR\x12schedulingMetadata\x12 \n" +
+	"\vcpuTemplate\x18\x06 \x01(\tR\vcpuTemplate\"\x83\x02\n" +
 	"\x15TemplateBuildLogEntry\x128\n" +
 	"\ttimestamp\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1f\n" +

@@ -277,3 +277,33 @@ func TestAppliedDigest(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, tmpl.Digest(), AppliedDigest(tmpl))
 }
+
+func TestAppliedJSON(t *testing.T) {
+	t.Parallel()
+
+	for _, raw := range []string{"", "null", "{}", `{"kvm_capabilities": []}`} {
+		tmpl, err := Parse([]byte(raw))
+		require.NoError(t, err)
+		assert.Empty(t, AppliedJSON(tmpl), "no settings must not acquire a configuration: %s", raw)
+	}
+	assert.Empty(t, AppliedJSON(&Template{}))
+
+	const want = `{"x86_tsc_khz":3200000}`
+	tmpl := &Template{X86TscKhz: 3_200_000}
+	assert.Equal(t, want, AppliedJSON(tmpl))
+	assert.NotEqual(t, want, AppliedJSON(&Template{X86TscKhz: 2_400_000}))
+
+	a, err := Parse([]byte(`{"x86_tsc_khz": 3200000, "kvm_capabilities": ["!121"]}`))
+	require.NoError(t, err)
+	b, err := Parse([]byte("{\n  \"kvm_capabilities\": [\"!121\"],\n  \"x86_tsc_khz\": 3200000\n}"))
+	require.NoError(t, err)
+	assert.Equal(t, AppliedJSON(a), AppliedJSON(b), "JSON formatting must not change the stored configuration")
+
+	for _, raw := range []string{cpuidTemplate, `{"kvm_capabilities":["!122","!121"],"x86_tsc_khz":3200000}`} {
+		original, err := Parse([]byte(raw))
+		require.NoError(t, err)
+		restored, err := Parse([]byte(AppliedJSON(original)))
+		require.NoError(t, err)
+		assert.Equal(t, original, restored, "complete settings and modifier order must survive normalization")
+	}
+}

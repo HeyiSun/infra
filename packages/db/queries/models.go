@@ -5,6 +5,7 @@
 package queries
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/e2b-dev/infra/packages/db/pkg/types"
@@ -72,6 +73,8 @@ type EnvBuild struct {
 	CpuFlags           []string
 	StatusGroup        types.BuildStatusGroup
 	TeamID             *uuid.UUID
+	// Complete applied custom CPU template JSON; NULL when no configuration is reported. Does not certify CPU compatibility.
+	CpuTemplate json.RawMessage
 }
 
 type Snapshot struct {

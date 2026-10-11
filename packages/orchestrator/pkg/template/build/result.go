@@ -3,9 +3,26 @@
 package build
 
 import (
+	"github.com/e2b-dev/infra/packages/orchestrator/pkg/sandbox/fc/cputemplate"
+	"github.com/e2b-dev/infra/packages/orchestrator/pkg/template/build/buildcontext"
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/template/build/builderrors"
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/template/build/metrics"
+	"github.com/e2b-dev/infra/packages/orchestrator/pkg/template/metadata"
+	orchestratorgrpc "github.com/e2b-dev/infra/packages/shared/pkg/grpc/orchestrator"
+	"github.com/e2b-dev/infra/packages/shared/pkg/units"
 )
+
+func newResult(bc buildcontext.BuildContext, finalMetadata metadata.Template, rootfsSize uint64, scheduling *orchestratorgrpc.SchedulingMetadata) *Result {
+	return &Result{
+		EnvdVersion:        bc.EnvdVersion,
+		KernelVersion:      bc.Config.KernelVersion,
+		FirecrackerVersion: bc.Config.FirecrackerVersion,
+		// Record the final artifact's settings, not the requested flag or its ancestor's settings.
+		CPUTemplate:        cputemplate.AppliedJSON(finalMetadata.CPUTemplate),
+		RootfsSizeMB:       units.BytesToMB(int64(rootfsSize)),
+		SchedulingMetadata: scheduling,
+	}
+}
 
 // ClassifyBuildResult maps the outcome of Builder.Build to the value used both
 // as the `result` label on template_build_result_total and as the build.result

@@ -43,6 +43,8 @@ sql:
             go_type: "github.com/e2b-dev/infra/packages/db/pkg/types.BuildStatusGroup"
           - column: "public.env_builds.reason"
             go_type: "github.com/e2b-dev/infra/packages/db/pkg/types.BuildReason"
+          - column: "public.env_builds.cpu_template"
+            go_type: "encoding/json.RawMessage"
           - column: "public.snapshots.config"
             go_type:
               import: "github.com/e2b-dev/infra/packages/db/pkg/types"

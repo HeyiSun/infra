@@ -303,6 +303,7 @@ func (s *ServerStore) TemplateCreate(ctx context.Context, templateRequest *templ
 				EnvdVersionKey:     res.EnvdVersion,
 				KernelVersion:      res.KernelVersion,
 				FirecrackerVersion: res.FirecrackerVersion,
+				CpuTemplate:        res.CPUTemplate,
 				SchedulingMetadata: res.SchedulingMetadata,
 			})
 			telemetry.ReportEvent(ctx, "Environment built")

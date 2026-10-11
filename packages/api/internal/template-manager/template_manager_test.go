@@ -17,6 +17,7 @@ var _ templateManagerClient = (*fakeTemplateManagerClient)(nil)
 type fakeTemplateManagerClient struct {
 	setStatusError   error
 	setFinishedError error
+	onSetFinished    func(string)
 
 	getStatusResponse *templatemanagergrpc.TemplateBuildStatusResponse
 	getStatusErr      error
@@ -30,7 +31,11 @@ func (f fakeTemplateManagerClient) DeleteBuild(context.Context, uuid.UUID, strin
 	return nil
 }
 
-func (f fakeTemplateManagerClient) SetFinished(context.Context, uuid.UUID, int64, string, string, string) error {
+func (f fakeTemplateManagerClient) SetFinished(_ context.Context, _ uuid.UUID, _ int64, _, _, _, cpuTemplate string) error {
+	if f.onSetFinished != nil {
+		f.onSetFinished(cpuTemplate)
+	}
+
 	return f.setFinishedError
 }
 

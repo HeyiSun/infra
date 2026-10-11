@@ -15,10 +15,46 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/e2b-dev/infra/packages/orchestrator/pkg/sandbox/fc/cputemplate"
+	"github.com/e2b-dev/infra/packages/orchestrator/pkg/template/build/buildcontext"
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/template/build/builderrors"
+	"github.com/e2b-dev/infra/packages/orchestrator/pkg/template/build/config"
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/template/build/metrics"
 	"github.com/e2b-dev/infra/packages/orchestrator/pkg/template/build/phases"
+	"github.com/e2b-dev/infra/packages/orchestrator/pkg/template/metadata"
 )
+
+func TestResultCPUTemplateUsesFinalArtifact(t *testing.T) {
+	t.Parallel()
+
+	requested := &cputemplate.Template{X86TscKhz: 3_200_000}
+	applied := &cputemplate.Template{X86TscKhz: 2_400_000}
+	bc := buildcontext.BuildContext{Config: config.TemplateConfig{CPUTemplate: requested}}
+
+	for _, tt := range []struct {
+		name    string
+		applied *cputemplate.Template
+		want    string
+	}{
+		{
+			name:    "final settings differ from requested and original settings",
+			applied: applied,
+			want:    `{"x86_tsc_khz":2400000}`,
+		},
+		{name: "no applied settings does not inherit a template"},
+		{name: "empty applied settings has no template", applied: &cputemplate.Template{}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := newResult(bc, metadata.Template{
+				CPUTemplate:      tt.applied,
+				BuildCPUTemplate: requested,
+			}, 0, nil)
+			assert.Equal(t, tt.want, result.CPUTemplate)
+		})
+	}
+}
 
 func TestClassifyBuildResult(t *testing.T) {
 	t.Parallel()

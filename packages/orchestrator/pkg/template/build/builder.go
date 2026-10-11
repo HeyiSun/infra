@@ -99,6 +99,7 @@ type Result struct {
 	EnvdVersion        string
 	KernelVersion      string
 	FirecrackerVersion string
+	CPUTemplate        string
 	RootfsSizeMB       int64
 	SchedulingMetadata *orchestratorgrpc.SchedulingMetadata
 }
@@ -452,13 +453,8 @@ func runBuild(
 	}
 	logger.L().Info(ctx, "rootfs size", zap.Uint64("size", rootfsSize))
 
-	return &Result{
-		EnvdVersion:        bc.EnvdVersion,
-		KernelVersion:      bc.Config.KernelVersion,
-		FirecrackerVersion: bc.Config.FirecrackerVersion,
-		RootfsSizeMB:       units.BytesToMB(int64(rootfsSize)),
-		SchedulingMetadata: templateSchedulingMetadata(ctx, builder.templateCache, lastLayerResult.Metadata.Template.BuildID),
-	}, nil
+	return newResult(bc, lastLayerResult.Metadata, rootfsSize,
+		templateSchedulingMetadata(ctx, builder.templateCache, lastLayerResult.Metadata.Template.BuildID)), nil
 }
 
 func templateSchedulingMetadata(ctx context.Context, cache *sbxtemplate.Cache, buildID string) *orchestratorgrpc.SchedulingMetadata {

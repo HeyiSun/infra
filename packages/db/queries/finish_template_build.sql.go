@@ -7,6 +7,7 @@ package queries
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/e2b-dev/infra/packages/db/pkg/types"
 	"github.com/google/uuid"
@@ -21,9 +22,10 @@ WITH finished AS (
         status = $2,
         envd_version = $3,
         kernel_version = COALESCE(NULLIF($4::text, ''), kernel_version),
-        firecracker_version = COALESCE(NULLIF($5::text, ''), firecracker_version)
+        firecracker_version = COALESCE(NULLIF($5::text, ''), firecracker_version),
+        cpu_template = $6
     WHERE
-        id = $6
+        id = $7
         AND status_group NOT IN ('ready', 'failed')
     RETURNING id
 )
@@ -37,6 +39,7 @@ type FinishTemplateBuildParams struct {
 	EnvdVersion        *string
 	KernelVersion      string
 	FirecrackerVersion string
+	CpuTemplate        json.RawMessage
 	BuildID            uuid.UUID
 }
 
@@ -45,6 +48,8 @@ type FinishTemplateBuildParams struct {
 // that do not populate those fields end up passing an empty string; the
 // NULLIF + COALESCE trick leaves the row's existing values untouched in that
 // case so we do not clobber the values the API seeded at build registration.
+// The CPU template records what the builder actually applied. NULL means no
+// configuration was reported; unlike the versions, it has no seeded value.
 // The build keeps the first terminal outcome recorded: a build failed for
 // running out of time has had its artifacts deleted, so a later success must
 // not publish it.
@@ -55,6 +60,7 @@ func (q *Queries) FinishTemplateBuild(ctx context.Context, arg FinishTemplateBui
 		arg.EnvdVersion,
 		arg.KernelVersion,
 		arg.FirecrackerVersion,
+		arg.CpuTemplate,
 		arg.BuildID,
 	)
 	return err

@@ -137,6 +137,8 @@ type EnvBuild struct {
 	CpuFlags           []string
 	StatusGroup        string
 	TeamID             *uuid.UUID
+	// Complete applied custom CPU template JSON; NULL when no configuration is reported. Does not certify CPU compatibility.
+	CpuTemplate []byte
 }
 
 type EnvBuildAssignment struct {
